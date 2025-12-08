@@ -1,15 +1,16 @@
 import pandas as pd
 from pathlib import Path
-from typing import Union
+from typing import Union, BinaryIO, IO
 
 from .utils.conversions import ft_in_to_ft
 from .config.excel_columns import EXCEL_COLUMN_MAP, REQUIRED_EXCEL_COLUMNS
 
 # build_master_csv: converts excel file to a  manageable csv
+ExcelSource = Union[Path, str, BinaryIO, IO[bytes]]
 
 def build_master_csv(
         template_path: Path,
-        excel_path: Path,
+        excel_source: ExcelSource,
         excel_sheet: Union[str, int],
         output_path: Path,
 ):
@@ -20,10 +21,23 @@ def build_master_csv(
     target_columns = base_template.columns
 
     # --- 2) Load Excel sheet with all the raw data ---
-    raw = pd.read_excel(
-        excel_path,
-        sheet_name=excel_sheet
-    )
+    # read from in-memory file-like object
+    if isinstance(excel_source, (str, Path)):
+        raw = pd.read_excel(
+            excel_source,
+            sheet_name=excel_sheet
+        )
+    else:
+        try:
+            excel_source.seek(0)
+        except Exception:
+            pass
+        raw = pd.read_excel(
+            excel_source,
+            sheet_name=excel_sheet
+        )
+
+
     # Validate required columns
     missing = [c for c in REQUIRED_EXCEL_COLUMNS if c not in raw.columns]
     if missing:

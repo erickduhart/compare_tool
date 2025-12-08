@@ -3,7 +3,7 @@ import pandas as pd
 import altair as alt
 import numpy as np
 
-from .config import M_TO_FT, COLOR_REG
+from .config import M_TO_FT, COLOR_REG, COLOR_CHARTS, COLOR_LINES
 
 
 def render_charts_tab(filtered: pd.DataFrame, length_unit: str) -> None:
@@ -423,8 +423,8 @@ def render_charts_tab(filtered: pd.DataFrame, length_unit: str) -> None:
                         ),
                         color=alt.condition(
                             "datum.residual > 0",
-                            alt.value("#3889b9"),   # red for overpriced
-                            alt.value("#3889b9"),   # green for good value
+                            alt.value(COLOR_CHARTS),   # red for overpriced
+                            alt.value(COLOR_CHARTS),   # green for good value
                         ),
                         tooltip=[
                             "name",
@@ -447,7 +447,7 @@ def render_charts_tab(filtered: pd.DataFrame, length_unit: str) -> None:
 
                 zero_line = (
                     alt.Chart(pd.DataFrame({"residual": [0.0]}))
-                    .mark_rule(strokeDash=[4, 4], color="#666666")
+                    .mark_rule(strokeDash=[4, 4], color=COLOR_LINES)
                     .encode(y="residual:Q")
                 )
 
