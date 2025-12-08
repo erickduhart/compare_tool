@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+
+.vscode/
+.venv/
+env/
+*.env
+
+data_new/
+assets/
+old/
