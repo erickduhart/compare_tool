@@ -177,6 +177,10 @@ def build_master_csv(
             
 
     # --- 5) Save the result to a new CSV ---
+    # Ensure the output directory exists
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # save to csv 
     out.to_csv(output_path, index=False)
 
     print(f"Saved transformed dataset to: {output_path}")
