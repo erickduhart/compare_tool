@@ -3,7 +3,7 @@ import pandas as pd
 import altair as alt
 import numpy as np
 
-from .config import M_TO_FT, COLOR_REG
+from .config import M_TO_FT, COLOR_REG, COLOR_CHARTS, COLOR_LINES
 
 
 def render_charts_tab(filtered: pd.DataFrame, length_unit: str) -> None:
@@ -14,7 +14,7 @@ def render_charts_tab(filtered: pd.DataFrame, length_unit: str) -> None:
     - Base price distribution histogram
     - Boxplot for selected key metric
     - Price vs gross tonnage scatter
-    - Price per GT ranking bar chart
+    - Price per GT/Area ranking bar chart
     """
     st.markdown("### Charts")
 
@@ -258,6 +258,9 @@ def render_charts_tab(filtered: pd.DataFrame, length_unit: str) -> None:
             )
 
             # Polynomial regression line (order 2)
+            # Requires at least 3 data points, else altair raises an error
+            # here higher order polynomials seems to overfit too much
+            # Not sure if the regression is really meaningful in this context, but it's illustrative
             poly_reg = (
                 alt.Chart(vol_df)
                 .transform_regression(
@@ -370,7 +373,7 @@ def render_charts_tab(filtered: pd.DataFrame, length_unit: str) -> None:
 
 
     # ----------------------------------------------------------------------
-    # Residuals chart: actual price - predicted price (value indicator)
+    # Residuals chart: actual price - residuals (value indicator)
     # with toggle between bar chart and scatter (using chosen metric)
     # ----------------------------------------------------------------------
     if "base_price" in chart_df.columns and volume_col is not None:
@@ -378,7 +381,7 @@ def render_charts_tab(filtered: pd.DataFrame, length_unit: str) -> None:
 
         vol_df = chart_df.dropna(subset=["base_price", volume_col]).copy()
 
-        # Need at least 3 points to fit a quadratic polynomial
+        # Need at least 3 points to fit a quadratic polynomial, same as before
         if len(vol_df) >= 3:
             x = np.asarray(vol_df[volume_col].astype(float).values, dtype=float)
             y = np.asarray(vol_df["base_price"].astype(float).values, dtype=float)
@@ -423,8 +426,8 @@ def render_charts_tab(filtered: pd.DataFrame, length_unit: str) -> None:
                         ),
                         color=alt.condition(
                             "datum.residual > 0",
-                            alt.value("#3889b9"),   # red for overpriced
-                            alt.value("#3889b9"),   # green for good value
+                            alt.value(COLOR_CHARTS),   # red for overpriced
+                            alt.value(COLOR_CHARTS),   # green for good value
                         ),
                         tooltip=[
                             "name",
@@ -447,7 +450,7 @@ def render_charts_tab(filtered: pd.DataFrame, length_unit: str) -> None:
 
                 zero_line = (
                     alt.Chart(pd.DataFrame({"residual": [0.0]}))
-                    .mark_rule(strokeDash=[4, 4], color="#666666")
+                    .mark_rule(strokeDash=[4, 4], color=COLOR_LINES)
                     .encode(y="residual:Q")
                 )
 

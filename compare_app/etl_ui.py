@@ -1,15 +1,12 @@
 import streamlit as st
 import pandas as pd
-from pathlib import Path
 
 from yacht_etl import build_master_csv
 from .config import (
     BASE_TEMPLATE_PATH,
     OUTPUT_PATH,
-    NEW_DATA_DIR,
     __version__,
 )
-
 
 def render_sidebar_etl() -> None:
     """
@@ -21,9 +18,6 @@ def render_sidebar_etl() -> None:
     """
     # ----- Sidebar header --------
     st.sidebar.header("**Options**")
-
-    # Show version
-    #st.sidebar.caption(f"App version: **{__version__}**")
     st.sidebar.markdown("---")
 
     # --- Upload Excel cheatsheet -------------------------------------------
@@ -48,7 +42,6 @@ def render_sidebar_etl() -> None:
             st.sidebar.error(f"Failed to read Excel file: {e}")
 
     # --- Run ETL button -----------------------------------------------------
-    #st.sidebar.markdown("---")
     rebuild = st.sidebar.button("Build / refresh CSV")
 
     if rebuild:
@@ -63,20 +56,21 @@ def render_sidebar_etl() -> None:
         st.sidebar.info("Running ETL to build dataset…")
 
         try:
-            # make sure output dir exists
-            NEW_DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-            # Save uploaded file to disk so build_master_csv can read it by its path
-            uploaded_excel_path: Path = NEW_DATA_DIR / "uploaded_cheatsheet.xlsx"
-            uploaded_excel_path.write_bytes(excel_file.getbuffer())
-
             # Run the ETL builder
             build_master_csv(
                 template_path=BASE_TEMPLATE_PATH,
-                excel_path=uploaded_excel_path,
+                excel_source=excel_file,
                 excel_sheet=sheet_name,
                 output_path=OUTPUT_PATH,
             )
+
+            # ---- memory handling ----
+            # drop references so Python can free memory
+            del sheet_name
+            del excel_file
+
+            st.session_state.pop("cheatsheet_uploader", None)
+            st.session_state.pop("cheatsheet_sheet", None)
 
             st.sidebar.success("ETL completed successfully ✅")
         except Exception as e:
@@ -87,6 +81,9 @@ def render_sidebar_etl() -> None:
 
     st.sidebar.markdown("---")
 
+    # --- paths info --------------------------------------------------------
+    # not very useful to be honest as it is run on a container, but whatever
+    # good for building locally
     st.sidebar.write("Current paths:")
     st.sidebar.code(f"Template: {BASE_TEMPLATE_PATH}")
     st.sidebar.code(f"Output:   {OUTPUT_PATH}")

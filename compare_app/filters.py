@@ -9,15 +9,19 @@ def render_filters(df: pd.DataFrame, length_unit: str) -> pd.DataFrame:
     Render the global filters and return a filtered copy of df.
 
     Filters:
-    - Displacement type (exact match)
-    - Material (exact match)
-    - Base price range (M€)
-    - LOA range (slider in m or ft, depending on length_unit)
+    - Displacement type (exact match) Not sure if this is useful enough  
+    - Material (exact match) Might be useful, don't know yet
+    - Base price range (M€) Very useful
+    - LOA range (slider in m or ft, depending on length_unit) Very useful
     """
+    # TODO: add option to reset all filters?
+    # TODO: consider adding/change more filters (e.g., year, etc.)
+
     st.markdown("### Filters")
 
-    # wwe make sure numeric value for sliders (in case something came as object, etc.)
+    # we make sure numeric value for sliders (in case something came as object, etc.)
     # This should already be handled in the ETL, but we repeat here as redundancy.
+    # Copy to avoid modifying original df
     df = df.copy()
     if "base_price" in df.columns:
         df["base_price"] = pd.to_numeric(df["base_price"], errors="coerce")

@@ -11,9 +11,7 @@ if str(SRC) not in sys.path:
     
 DATA_DIR = ROOT / "data"
 NEW_DATA_DIR = ROOT / "data_new"
-
 BASE_TEMPLATE_PATH = DATA_DIR / "base_yacht_master.csv"
-#EXCEL_PATH = DATA_DIR / 
 OUTPUT_PATH = NEW_DATA_DIR / "yachts_master.csv"
 
 
@@ -22,6 +20,8 @@ M_TO_FT = 3.28084
 COLOR_A = "#000000"
 COLOR_B = "#C5C7C4"
 COLOR_REG = "#ff3366"
+COLOR_CHARTS = "#3889b9"
+COLOR_LINES = "#666666"
 
-__version__ = "v0.0205 prev"
+__version__ = "v0.0207 prev"
 APP_TITLE = "Yachts Comparison Dashboard"

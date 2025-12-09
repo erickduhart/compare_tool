@@ -39,9 +39,10 @@ def main():
     st.session_state["length_unit"] = length_unit
 
     # --- Sidebar: ETL + settings -------------------------------------------
-    # ETL / cheatsheet upload / build master CSV
+    # ETL: Excel sheet upload -> build CSV
     render_sidebar_etl()
-    # --- Load master dataset -----------------------------------------------
+
+    # Load master dataset
     if not OUTPUT_PATH.exists():
         st.info(
             "No dataset found yet. "
@@ -68,6 +69,7 @@ def main():
         ["Overview", "Table", "Compare", "Charts & Analytics"]
     )
 
+    # render each tab
     with tab_overview:
         render_overview_tab(filtered, length_unit)
 

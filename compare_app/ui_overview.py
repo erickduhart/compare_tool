@@ -7,7 +7,7 @@ from .config import M_TO_FT
 def render_overview_tab(filtered: pd.DataFrame, length_unit: str) -> None:
     """
     Render the 'Overview' tab:
-    - KPIs (count, avg price, avg LOA, avg GT)
+    - KPIs (count, avg price, avg LOA, avg GT). need to check which ones are better to show
     - Yacht detail view for a single selected yacht
     """
     # Create side cols + a main center column for data display
@@ -88,6 +88,7 @@ def render_overview_tab(filtered: pd.DataFrame, length_unit: str) -> None:
         yacht_row = filtered[filtered["name"] == selected_yacht].iloc[0]
 
         # --- Derived values for units -------------------------------------------
+        # same used in compare tab
         loa_m = yacht_row.get("loa_metric")
         beam_m = yacht_row.get("beam_metric")
         draft_m = yacht_row.get("draft_full_load_metric")
