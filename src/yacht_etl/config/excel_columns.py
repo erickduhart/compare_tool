@@ -65,4 +65,7 @@ EXCEL_COLUMN_MAP = {
 }
 
 # For validation: which Excel columns MUST exist
+# this should be displayed to the user if any are missing (i.e. in the sidebar of the app)
+# The excel columns need to be in perfect match with the keys of EXCEL_COLUMN_MAP 
+# otherwise everything will fail
 REQUIRED_EXCEL_COLUMNS = list(EXCEL_COLUMN_MAP.keys())

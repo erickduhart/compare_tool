@@ -17,7 +17,8 @@ def render_table_tab(df: pd.DataFrame, filtered: pd.DataFrame) -> None:
     # Display the filtered dataframe
     st.dataframe(filtered, use_container_width=True)
 
-    # Download button for filtered data
+    # Download button for filtered data as a csv 
+    # useful if the csv is needed for further analysis outside the app
     csv_bytes = filtered.to_csv(index=False).encode("utf-8")
     st.download_button(
         label="Download filtered CSV",

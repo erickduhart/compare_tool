@@ -12,8 +12,6 @@ def render_compare_tab(filtered: pd.DataFrame, length_unit: str) -> None:
     size outlines, visual bar charts and radar chart.
     """
 
-    #col_left, col_main, col_right = st.columns([1, 3, 1])
-    #with col_main:
     st.markdown("### Compare two yachts")
 
     # --- basic guards --------------------------------------------------------
@@ -46,6 +44,7 @@ def render_compare_tab(filtered: pd.DataFrame, length_unit: str) -> None:
     def safe_get(row: pd.Series, col: str):
         return row.get(col) if col in row.index else None
 
+    # Deal with units and formatting
     def format_perf(cs, ms, rg) -> str:
         cs_s = f"{cs:.1f} kn" if pd.notna(cs) else "–"
         ms_s = f"{ms:.1f} kn" if pd.notna(ms) else "–"
@@ -60,6 +59,7 @@ def render_compare_tab(filtered: pd.DataFrame, length_unit: str) -> None:
         return f"{f_s} / {fw_s} / {ww_s} / {u_s}"
 
     # --- base numeric values --------------------------------------------------
+    # Some are not used directly but kept for clarity or future use
     base_a = safe_get(row_a, "base_price")
     base_b = safe_get(row_b, "base_price")
 
@@ -294,6 +294,8 @@ def render_compare_tab(filtered: pd.DataFrame, length_unit: str) -> None:
 
     
     # --- Visual comparison bar chart -----------------------------------------
+    # Not sure if this is needed with the full specs above, but leaving it for now
+    # mayber useful for quick visual, or could improve later
     st.markdown("---")
     st.markdown("#### Visual comparison")
 

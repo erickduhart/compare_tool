@@ -42,7 +42,6 @@ def render_sidebar_etl() -> None:
             st.sidebar.error(f"Failed to read Excel file: {e}")
 
     # --- Run ETL button -----------------------------------------------------
-    #st.sidebar.markdown("---")
     rebuild = st.sidebar.button("Build / refresh CSV")
 
     if rebuild:
@@ -82,6 +81,9 @@ def render_sidebar_etl() -> None:
 
     st.sidebar.markdown("---")
 
+    # --- paths info --------------------------------------------------------
+    # not very useful to be honest as it is run on a container, but whatever
+    # good for building locally
     st.sidebar.write("Current paths:")
     st.sidebar.code(f"Template: {BASE_TEMPLATE_PATH}")
     st.sidebar.code(f"Output:   {OUTPUT_PATH}")

@@ -5,9 +5,9 @@ from typing import Union, BinaryIO, IO
 from .utils.conversions import ft_in_to_ft
 from .config.excel_columns import EXCEL_COLUMN_MAP, REQUIRED_EXCEL_COLUMNS
 
-# build_master_csv: converts excel file to a  manageable csv
-ExcelSource = Union[Path, str, BinaryIO, IO[bytes]]
 
+ExcelSource = Union[Path, str, BinaryIO, IO[bytes]]
+# build_master_csv: converts excel file to a manageable csv
 def build_master_csv(
         template_path: Path,
         excel_source: ExcelSource,
@@ -46,13 +46,10 @@ def build_master_csv(
             f"Available columns: {list(raw.columns)}"
         )
 
-    # Normalize column names to internal names
+    # ---- 3) Normalize column names to internal names ----
     raw = raw.rename(columns=EXCEL_COLUMN_MAP)
-    # --- from here on, ONLY use internal names! ---
-    # e.g., raw["name"], raw["base_price_million_eur"], raw["fuel_oil_cap"], etc.
-
-    # --- 3) add displacement_type ---
-
+    # from here on, we ONLY use internal names (for consistency)! 
+    # add displacement_type col to df based on section headers in Name col
     # Convert Name to string for safe string ops
     name_str = raw["name"].astype(str)
 

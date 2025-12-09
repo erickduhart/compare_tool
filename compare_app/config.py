@@ -23,5 +23,5 @@ COLOR_REG = "#ff3366"
 COLOR_CHARTS = "#3889b9"
 COLOR_LINES = "#666666"
 
-__version__ = "v0.0205 prev"
+__version__ = "v0.0207 prev"
 APP_TITLE = "Yachts Comparison Dashboard"
