@@ -20,6 +20,8 @@ def render_filters(df: pd.DataFrame, length_unit: str) -> pd.DataFrame:
     - LOA range (slider in m or ft, depending on length_unit) Very useful
     """
     # TODO: consider adding/change more filters (e.g., year, etc.)
+    # Maybe not needed, depends on request
+    # I think all relevant categorical filters and numeric range filters are covered
 
     st.markdown("### Filters")
     reset_filters = st.button("Reset filters")
