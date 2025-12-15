@@ -95,15 +95,28 @@ def render_compare_tab(filtered: pd.DataFrame, length_unit: str) -> None:
         # Normalize each metric to [0,1] based on max value
         norm = pd.DataFrame({"name": data["name"]})
 
-        for col in available_metrics:
-            s = data[col]
-            vmax = s.max(skipna=True)
+        # Special case for price: lower is better
+        PRICE_COL = "base_price"
 
-            if pd.isna(vmax) or vmax <= 0:
-                # Degenerate / invalid -> neutral 0.5 ring so the axis still shows
-                norm[col] = 0.5
+        for col in available_metrics:
+            s = pd.to_numeric(data[col], errors="coerce")
+
+            if col == PRICE_COL:
+                # Invert: lower price → higher normalized value
+                vmin = s.min(skipna=True)
+                if pd.isna(vmin) or vmin <= 0:
+                    norm[col] = 0.5
+                else:
+                    norm[col] = vmin / s
             else:
-                norm[col] = s / vmax
+                vmax = s.max(skipna=True)
+                if pd.isna(vmax) or vmax <= 0:
+                    norm[col] = 0.5
+                else:
+                    norm[col] = s / vmax
+
+        # Ensure valid numeric range for plotting; fill missing to avoid broken polygons
+        norm[col] = norm[col].replace([float("inf"), -float("inf")], pd.NA).fillna(0.0).clip(0, 1)
 
         # Plotly
         long_df = norm.melt(
@@ -257,9 +270,19 @@ def render_compare_tab(filtered: pd.DataFrame, length_unit: str) -> None:
             max_idx = max(valid_indices, key=lambda i: vals[i])
             min_idx = min(valid_indices, key=lambda i: vals[i])
 
+            # We add a special case: price is better when lower i.e. green
+            metric_name = str(s.name).lower()
+            is_price = ("price" in metric_name)
+
             styles = [""] * len(s)
-            styles[max_idx] = "color: green; font-weight: bold;"
-            styles[min_idx] = "color: red;"
+            if is_price:
+                # For price, lower is better
+                styles[min_idx] = "color: green; font-weight: bold;"
+                styles[max_idx] = "color: red;"
+            else:
+                # For other metrics, higher is better
+                styles[max_idx] = "color: green; font-weight: bold;"
+                styles[min_idx] = "color: red;"
             return styles
 
         styled = (
