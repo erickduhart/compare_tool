@@ -1,12 +1,48 @@
 import pandas as pd
 from pathlib import Path
-from typing import Union, BinaryIO, IO
+import re
+from typing import (Union, BinaryIO, 
+                    IO, Any, Optional)
 
 from .utils.conversions import ft_in_to_ft
 from .config.excel_columns import EXCEL_COLUMN_MAP, REQUIRED_EXCEL_COLUMNS
 
 
 ExcelSource = Union[Path, str, BinaryIO, IO[bytes]]
+
+_NUM_RE = re.compile(r"(?<!\w)\d+(?:[.,]\d+)?")
+# Helper function to clean messy Excel data and build the final CSV
+def parse_max_number(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, float) and pd.isna(value):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    
+    s = str(value).strip().lower()
+    if not s or s in {"n/a", "na", "none", "-", "—"}:
+        return None
+    
+    s = s.replace(',', '.')  
+
+    nums = _NUM_RE.findall(s)
+    if not nums:
+        return None
+    
+    vals: list[float] = []
+    for n in nums:
+        try:
+            vals.append(float(n))
+        except ValueError:
+            pass
+    
+    return max(vals) if vals else None
+
+def parse_max_int(value: Any) -> Optional[int]:
+    m = parse_max_number(value)
+    return int(round(m)) if m is not None else None
+
 # build_master_csv: converts excel file to a manageable csv
 def build_master_csv(
         template_path: Path,
@@ -128,9 +164,9 @@ def build_master_csv(
         "waste_water": pd.to_numeric(data["waste_water_cap"], errors="coerce"),
 
         # Performance
-        "range_nm": pd.to_numeric(data["range_nm_raw"], errors="coerce"),
-        "cruise_speed_kn": pd.to_numeric(data["cruise_speed_kn_raw"], errors="coerce"),
-        "max_speed_kn": pd.to_numeric(data["max_speed_kn_raw"], errors="coerce"),
+        "range_nm": data["range_nm_raw"].apply(parse_max_number),
+        "cruise_speed_kn": data["cruise_speed_kn_raw"].apply(parse_max_number),
+        "max_speed_kn": data["max_speed_kn_raw"].apply(parse_max_number),
 
         # Machinery
         "engine": data["engine_raw"],
@@ -141,14 +177,15 @@ def build_master_csv(
         "stabilizers": data["stabilizers_raw"],
 
         # Accommodation
-        "guest_cabins_std": pd.to_numeric(data["guest_cabins_std_raw"], errors="coerce"),
-        "guest_beds_std": pd.to_numeric(data["guest_beds_std_raw"], errors="coerce"),
-        "guest_bathrooms_std": pd.to_numeric(data["guest_bathrooms_std_raw"], errors="coerce"),
+        "guest_cabins_std": data["guest_cabins_std_raw"].apply(parse_max_int),
+        "guest_beds_std": data["guest_beds_std_raw"].apply(parse_max_int),
+        "guest_bathrooms_std": data["guest_bathrooms_std_raw"].apply(parse_max_int),
 
         # Crew
-        "crew_cabins": pd.to_numeric(data["crew_cabins_raw"], errors="coerce"),
-        "crew_bathrooms": pd.to_numeric(data["crew_bathrooms_raw"], errors="coerce"),
-        "crew": pd.to_numeric(data["crew_std_raw"], errors="coerce"),
+        "crew_cabins": data["crew_cabins_raw"].apply(parse_max_int),
+        "crew_bathrooms": data["crew_bathrooms_raw"].apply(parse_max_int),
+        "crew": data["crew_std_raw"].apply(parse_max_int),
+
 
         # Toys / tenders / displacement type/ notes
         "jet_ski": pd.to_numeric(data["jet_ski_raw"], errors="coerce"),
