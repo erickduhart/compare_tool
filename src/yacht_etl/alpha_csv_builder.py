@@ -4,6 +4,9 @@ import re
 from typing import (Union, BinaryIO, 
                     IO, Any, Optional)
 
+import logging
+logger = logging.getLogger("yacht_etl")
+
 from .utils.conversions import ft_in_to_ft
 from .config.excel_columns import EXCEL_COLUMN_MAP, REQUIRED_EXCEL_COLUMNS
 
@@ -50,7 +53,11 @@ def build_master_csv(
         excel_sheet: Union[str, int],
         output_path: Path,
 ):
-
+    # logs
+    logger.info("Starting build_master_csv")
+    logger.info("Template: %s", template_path)
+    logger.info("Output: %s", output_path)
+    logger.info("Excel sheet: %s", excel_sheet)
 
     # --- 1) Load template to get the target column order ---
     base_template = pd.read_csv(template_path)
@@ -73,6 +80,7 @@ def build_master_csv(
             sheet_name=excel_sheet
         )
 
+    logger.info("Loaded raw rows: %d", len(raw))
 
     # Validate required columns
     missing = [c for c in REQUIRED_EXCEL_COLUMNS if c not in raw.columns]
@@ -129,6 +137,10 @@ def build_master_csv(
     # Drop rows with missing Name
     data = data[~data["name"].isna()].copy()
 
+    logger.info("Rows after removing section headers: %d", len(data))
+    logger.info("Unique displacement types: %s", sorted(data["displacement_type"].dropna().unique().tolist()))
+
+
     # --- 5) Build the final DataFrame in the template structure ---
 
     out = pd.DataFrame({
@@ -136,7 +148,7 @@ def build_master_csv(
         "name": data["name"],
         # Base Price (2023) is in million €, convert to €
         # "base_price": pd.to_numeric(data["Base Price (2023)"], errors="coerce") * 1_000_000,
-        "base_price": pd.to_numeric(data["base_price_million_eur"], errors="coerce"),
+        "base_price": data["base_price_million_eur"].apply(parse_max_number),
         "price_m2": round(pd.to_numeric(data["price_m2"], errors="coerce")),
         "price_gt": round(pd.to_numeric(data["price_gt"], errors="coerce")),
         "price_ton": round(pd.to_numeric(data["price_ton"], errors="coerce")),
@@ -197,6 +209,25 @@ def build_master_csv(
     # Ensure exact column order as in base_yacht_master.csv
     out = out[target_columns]
 
+    # more logging
+    logger.info("Built output dataframe: rows=%d cols=%d", len(out), len(out.columns))
+    # Debug parsing success rates for messy fields
+    for col in [
+        "max_speed_kn",
+        "cruise_speed_kn",
+        "range_nm",
+        "guest_cabins_std",
+        "guest_beds_std",
+        "guest_bathrooms_std",
+        "crew_cabins",
+        "crew_bathrooms",
+        "crew",
+    ]:
+        if col in out.columns:
+            non_null = out[col].notna().sum()
+            logger.info("Parsed %-20s non-null=%d (%.1f%%)", col, non_null, 100 * non_null / max(len(out), 1))
+
+
     # dataframe cleaning and corrections
     out['engine'] = out['engine'].apply(
         lambda x: None if isinstance(x, str) and len(x) < 4 else x
@@ -220,6 +251,6 @@ def build_master_csv(
     # save to csv 
     out.to_csv(output_path, index=False)
 
-    print(f"Saved transformed dataset to: {output_path}")
-    print(f"Rows: {len(out)}, Columns: {len(out.columns)}")
+    logger.info("Saved transformed dataset to: %s", output_path)
+    logger.info("Rows: %d, Columns: %d", len(out), len(out.columns))
     return out

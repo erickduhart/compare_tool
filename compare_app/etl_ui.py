@@ -8,6 +8,10 @@ from .config import (
     __version__,
 )
 
+import logging
+logger = logging.getLogger("yacht_etl")
+
+
 def render_sidebar_etl() -> None:
     """
     Render the sidebar section for:
@@ -56,7 +60,10 @@ def render_sidebar_etl() -> None:
         st.sidebar.info("Running ETL to build dataset…")
 
         try:
+            # Ensure output directory exists (still needed)
+            OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
             # Run the ETL builder
+            logger.info("ETL request: sheet=%s output=%s", sheet_name, OUTPUT_PATH)
             build_master_csv(
                 template_path=BASE_TEMPLATE_PATH,
                 excel_source=excel_file,
@@ -74,6 +81,7 @@ def render_sidebar_etl() -> None:
 
             st.sidebar.success("ETL completed successfully ✅")
         except Exception as e:
+            logger.exception("ETL failed while building master CSV")
             st.sidebar.error(f"ETL failed: {e}")
 
 
