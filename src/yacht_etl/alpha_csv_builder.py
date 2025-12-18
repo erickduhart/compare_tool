@@ -1,12 +1,51 @@
 import pandas as pd
 from pathlib import Path
-from typing import Union, BinaryIO, IO
+import re
+from typing import (Union, BinaryIO, 
+                    IO, Any, Optional)
+
+import logging
+logger = logging.getLogger("yacht_etl")
 
 from .utils.conversions import ft_in_to_ft
 from .config.excel_columns import EXCEL_COLUMN_MAP, REQUIRED_EXCEL_COLUMNS
 
 
 ExcelSource = Union[Path, str, BinaryIO, IO[bytes]]
+
+_NUM_RE = re.compile(r"(?<!\w)\d+(?:[.,]\d+)?")
+# Helper function to clean messy Excel data and build the final CSV
+def parse_max_number(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, float) and pd.isna(value):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    
+    s = str(value).strip().lower()
+    if not s or s in {"n/a", "na", "none", "-", "—"}:
+        return None
+    
+    s = s.replace(',', '.')  
+
+    nums = _NUM_RE.findall(s)
+    if not nums:
+        return None
+    
+    vals: list[float] = []
+    for n in nums:
+        try:
+            vals.append(float(n))
+        except ValueError:
+            pass
+    
+    return max(vals) if vals else None
+
+def parse_max_int(value: Any) -> Optional[int]:
+    m = parse_max_number(value)
+    return int(round(m)) if m is not None else None
+
 # build_master_csv: converts excel file to a manageable csv
 def build_master_csv(
         template_path: Path,
@@ -14,7 +53,11 @@ def build_master_csv(
         excel_sheet: Union[str, int],
         output_path: Path,
 ):
-
+    # logs
+    logger.info("Starting build_master_csv")
+    logger.info("Template: %s", template_path)
+    logger.info("Output: %s", output_path)
+    logger.info("Excel sheet: %s", excel_sheet)
 
     # --- 1) Load template to get the target column order ---
     base_template = pd.read_csv(template_path)
@@ -37,6 +80,7 @@ def build_master_csv(
             sheet_name=excel_sheet
         )
 
+    logger.info("Loaded raw rows: %d", len(raw))
 
     # Validate required columns
     missing = [c for c in REQUIRED_EXCEL_COLUMNS if c not in raw.columns]
@@ -93,6 +137,10 @@ def build_master_csv(
     # Drop rows with missing Name
     data = data[~data["name"].isna()].copy()
 
+    logger.info("Rows after removing section headers: %d", len(data))
+    logger.info("Unique displacement types: %s", sorted(data["displacement_type"].dropna().unique().tolist()))
+
+
     # --- 5) Build the final DataFrame in the template structure ---
 
     out = pd.DataFrame({
@@ -100,7 +148,7 @@ def build_master_csv(
         "name": data["name"],
         # Base Price (2023) is in million €, convert to €
         # "base_price": pd.to_numeric(data["Base Price (2023)"], errors="coerce") * 1_000_000,
-        "base_price": pd.to_numeric(data["base_price_million_eur"], errors="coerce"),
+        "base_price": data["base_price_million_eur"].apply(parse_max_number),
         "price_m2": round(pd.to_numeric(data["price_m2"], errors="coerce")),
         "price_gt": round(pd.to_numeric(data["price_gt"], errors="coerce")),
         "price_ton": round(pd.to_numeric(data["price_ton"], errors="coerce")),
@@ -128,9 +176,9 @@ def build_master_csv(
         "waste_water": pd.to_numeric(data["waste_water_cap"], errors="coerce"),
 
         # Performance
-        "range_nm": pd.to_numeric(data["range_nm_raw"], errors="coerce"),
-        "cruise_speed_kn": pd.to_numeric(data["cruise_speed_kn_raw"], errors="coerce"),
-        "max_speed_kn": pd.to_numeric(data["max_speed_kn_raw"], errors="coerce"),
+        "range_nm": data["range_nm_raw"].apply(parse_max_number),
+        "cruise_speed_kn": data["cruise_speed_kn_raw"].apply(parse_max_number),
+        "max_speed_kn": data["max_speed_kn_raw"].apply(parse_max_number),
 
         # Machinery
         "engine": data["engine_raw"],
@@ -141,14 +189,15 @@ def build_master_csv(
         "stabilizers": data["stabilizers_raw"],
 
         # Accommodation
-        "guest_cabins_std": pd.to_numeric(data["guest_cabins_std_raw"], errors="coerce"),
-        "guest_beds_std": pd.to_numeric(data["guest_beds_std_raw"], errors="coerce"),
-        "guest_bathrooms_std": pd.to_numeric(data["guest_bathrooms_std_raw"], errors="coerce"),
+        "guest_cabins_std": data["guest_cabins_std_raw"].apply(parse_max_int),
+        "guest_beds_std": data["guest_beds_std_raw"].apply(parse_max_int),
+        "guest_bathrooms_std": data["guest_bathrooms_std_raw"].apply(parse_max_int),
 
         # Crew
-        "crew_cabins": pd.to_numeric(data["crew_cabins_raw"], errors="coerce"),
-        "crew_bathrooms": pd.to_numeric(data["crew_bathrooms_raw"], errors="coerce"),
-        "crew": pd.to_numeric(data["crew_std_raw"], errors="coerce"),
+        "crew_cabins": data["crew_cabins_raw"].apply(parse_max_int),
+        "crew_bathrooms": data["crew_bathrooms_raw"].apply(parse_max_int),
+        "crew": data["crew_std_raw"].apply(parse_max_int),
+
 
         # Toys / tenders / displacement type/ notes
         "jet_ski": pd.to_numeric(data["jet_ski_raw"], errors="coerce"),
@@ -159,6 +208,25 @@ def build_master_csv(
 
     # Ensure exact column order as in base_yacht_master.csv
     out = out[target_columns]
+
+    # more logging
+    logger.info("Built output dataframe: rows=%d cols=%d", len(out), len(out.columns))
+    # Debug parsing success rates for messy fields
+    for col in [
+        "max_speed_kn",
+        "cruise_speed_kn",
+        "range_nm",
+        "guest_cabins_std",
+        "guest_beds_std",
+        "guest_bathrooms_std",
+        "crew_cabins",
+        "crew_bathrooms",
+        "crew",
+    ]:
+        if col in out.columns:
+            non_null = out[col].notna().sum()
+            logger.info("Parsed %-20s non-null=%d (%.1f%%)", col, non_null, 100 * non_null / max(len(out), 1))
+
 
     # dataframe cleaning and corrections
     out['engine'] = out['engine'].apply(
@@ -183,6 +251,6 @@ def build_master_csv(
     # save to csv 
     out.to_csv(output_path, index=False)
 
-    print(f"Saved transformed dataset to: {output_path}")
-    print(f"Rows: {len(out)}, Columns: {len(out.columns)}")
+    logger.info("Saved transformed dataset to: %s", output_path)
+    logger.info("Rows: %d, Columns: %d", len(out), len(out.columns))
     return out

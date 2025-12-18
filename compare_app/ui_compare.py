@@ -2,9 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import altair as alt
-
+import plotly.express as px
 from .config import M_TO_FT
-
 
 def render_compare_tab(filtered: pd.DataFrame, length_unit: str) -> None:
     """
@@ -57,6 +56,131 @@ def render_compare_tab(filtered: pd.DataFrame, length_unit: str) -> None:
         ww_s = f"{waste:.0f} L" if pd.notna(waste) else "–"
         u_s = f"{urea:.0f} L" if pd.notna(urea) else "–"
         return f"{f_s} / {fw_s} / {ww_s} / {u_s}"
+
+    # --- radar chart helper function ---------------------------------------------------
+    def render_radar_chart(df_compare: pd.DataFrame) -> None:
+
+        if df_compare.empty:
+            st.info("Select at least one yacht to show the radar chart.")
+            return
+
+        if "name" not in df_compare.columns:
+            st.warning("No 'name' column found to identify yachts.")
+            return
+
+        metric_cols = {
+            "area": "Area (m²)",
+            "loa_metric": "Length (m)",
+            "base_price": "Price (M€)",
+            "range_nm": "Range (nm)",
+            "max_speed_kn": "Speed (kn)",
+        }
+
+        available_metrics = [c for c in metric_cols if c in df_compare.columns]
+        if len(available_metrics) < 2:
+            st.info("Not enough comparable numeric data to build the radar chart.")
+            return
+
+        # Prepare data
+        data = df_compare[["name"] + available_metrics].copy()
+
+        # Ensure numeric
+        for col in available_metrics:
+            data[col] = pd.to_numeric(data[col], errors="coerce")
+
+        if data[available_metrics].isna().all(axis=1).all():
+            st.info("No numeric values available for radar chart.")
+            return
+
+        # Normalize each metric to [0,1] based on max value
+        norm = pd.DataFrame({"name": data["name"]})
+
+        # Special case for price: lower is better
+        PRICE_COL = "base_price"
+
+        for col in available_metrics:
+            s = pd.to_numeric(data[col], errors="coerce")
+
+            if col == PRICE_COL:
+                # Invert: lower price → higher normalized value
+                vmin = s.min(skipna=True)
+                if pd.isna(vmin) or vmin <= 0:
+                    norm[col] = 0.5
+                else:
+                    norm[col] = vmin / s
+            else:
+                vmax = s.max(skipna=True)
+                if pd.isna(vmax) or vmax <= 0:
+                    norm[col] = 0.5
+                else:
+                    norm[col] = s / vmax
+
+        # Ensure valid numeric range for plotting; fill missing to avoid broken polygons
+        norm[col] = norm[col].replace([float("inf"), -float("inf")], pd.NA).fillna(0.0).clip(0, 1)
+
+        # Plotly
+        long_df = norm.melt(
+            id_vars="name",
+            value_vars=available_metrics,
+            var_name="metric",
+            value_name="value",
+        )
+
+        long_df["metric_label"] = long_df["metric"].map(metric_cols)
+        metric_order = [metric_cols[m] for m in available_metrics]
+
+        # Build radar chart
+        fig = px.line_polar(
+            long_df,
+            r="value",
+            theta="metric_label",
+            color="name",
+            line_close=True,
+            category_orders={"metric_label": metric_order},
+        )
+
+        # Filled polygons, proportional values
+        fig.update_traces(
+            fill="toself",
+            hovertemplate="%{theta}<br>relative: %{r:.2f}",
+        )
+
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, 1],
+                    showticklabels=True,
+                )
+            ),
+            legend_title_text="Yacht",
+            height=450,
+            title="Radar comparison: Area, Length, Price, Range, Speed",
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+
+    # normalization helper
+    def normalize_column(series: pd.Series) -> pd.Series:
+        """Robust normalization to [0,1] with fallback for degenerate cases."""
+        s = pd.to_numeric(series, errors="coerce")
+
+        # If everything is NaN → return a neutral flat shape at 0.5
+        if s.isna().all():
+            return pd.Series([0.5] * len(s), index=s.index)
+
+        valid = s.dropna()
+        vmin, vmax = valid.min(), valid.max()
+
+        # If all values equal OR only 1 unique value → no dynamic range
+        if vmax == vmin:
+            return pd.Series([0.5] * len(s), index=s.index)
+
+        # Safe normalization
+        return (s - vmin) / (vmax - vmin)
+
+
 
     # --- base numeric values --------------------------------------------------
     # Some are not used directly but kept for clarity or future use
@@ -146,9 +270,19 @@ def render_compare_tab(filtered: pd.DataFrame, length_unit: str) -> None:
             max_idx = max(valid_indices, key=lambda i: vals[i])
             min_idx = min(valid_indices, key=lambda i: vals[i])
 
+            # We add a special case: price is better when lower i.e. green
+            metric_name = str(s.name).lower()
+            is_price = ("price" in metric_name)
+
             styles = [""] * len(s)
-            styles[max_idx] = "color: green; font-weight: bold;"
-            styles[min_idx] = "color: red;"
+            if is_price:
+                # For price, lower is better
+                styles[min_idx] = "color: green; font-weight: bold;"
+                styles[max_idx] = "color: red;"
+            else:
+                # For other metrics, higher is better
+                styles[max_idx] = "color: green; font-weight: bold;"
+                styles[min_idx] = "color: red;"
             return styles
 
         styled = (
@@ -344,4 +478,13 @@ def render_compare_tab(filtered: pd.DataFrame, length_unit: str) -> None:
                             width=600,)
             )
             st.altair_chart(chart, use_container_width=False)
+
+    # --- Radar chart comparison -----------------------------------------------
+    st.markdown("---")
+    st.markdown("#### Radar chart comparison")
+
+    # Only the two selected yachts
+    df_compare = comp_df[comp_df["name"].isin([yacht_a_name, yacht_b_name])].copy()
+    render_radar_chart(df_compare)
+
 

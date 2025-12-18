@@ -8,6 +8,10 @@ if str(SRC) not in sys.path:
     sys.path.append(str(SRC))
 
 from yacht_etl.io.master_loader import load_csv_file
+from yacht_etl.logger import setup_logger
+
+logger = setup_logger()
+logger.info("Starting main_app.py")
 
 from compare_app.config import APP_TITLE, OUTPUT_PATH, __version__
 from compare_app.etl_ui import render_sidebar_etl
@@ -41,9 +45,19 @@ def main():
     # --- Sidebar: ETL + settings -------------------------------------------
     # ETL: Excel sheet upload -> build CSV
     render_sidebar_etl()
+    
+    # --- Debug: show ETL logs in the sidebar ---------------------------------
+    if st.sidebar.checkbox("Show ETL logs (debug)", value=False):
+        log_file = Path.cwd() / "logs" / "yacht_etl.log"
+        if log_file.exists():
+            lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
+            st.sidebar.code("\n".join(lines[-200:]))
+        else:
+            st.sidebar.info("No log file found yet (run ETL once).")
 
     # Load master dataset
     if not OUTPUT_PATH.exists():
+        logger.warning("No existing dataset found at: %s", OUTPUT_PATH)
         st.info(
             "No dataset found yet. "
             "Upload an Excel sheet and click **Build / refresh CSV** "
@@ -52,8 +66,10 @@ def main():
         return
 
     try:
+        logger.info("Using existing dataset: %s (ETL not triggered this run)", OUTPUT_PATH)
         df = load_csv_file(OUTPUT_PATH)
     except Exception as e:
+        logger.exception("Failed to load CSV from %s: %s", OUTPUT_PATH, e)
         st.error(f"Failed to load CSV from {OUTPUT_PATH}: {e}")
         return
 
