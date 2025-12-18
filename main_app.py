@@ -57,6 +57,7 @@ def main():
 
     # Load master dataset
     if not OUTPUT_PATH.exists():
+        logger.warning("No existing dataset found at: %s", OUTPUT_PATH)
         st.info(
             "No dataset found yet. "
             "Upload an Excel sheet and click **Build / refresh CSV** "
@@ -65,6 +66,7 @@ def main():
         return
 
     try:
+        logger.info("Using existing dataset: %s (ETL not triggered this run)", OUTPUT_PATH)
         df = load_csv_file(OUTPUT_PATH)
     except Exception as e:
         logger.exception("Failed to load CSV from %s: %s", OUTPUT_PATH, e)
